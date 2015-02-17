@@ -7,15 +7,12 @@ splitStr f s = let (word, part) = break f (dropWhile f s)
                in word : splitStr f (dropWhile f part)
 
 checkDivisors :: Int -> Int -> Int -> Bool
-checkDivisors v d maxd = if d <= maxd then
-                             if mod v d == 0 then False
-                             else checkDivisors v (d + 1) maxd
-                         else True
+checkDivisors v d maxd | d <= maxd = if mod v d == 0 then False else checkDivisors v (d + 1) maxd
+                       | otherwise = True
 
 isPrime :: Int -> Bool
-isPrime v = if v > 2 then
-                if odd v then checkDivisors v 3 ((floor . sqrt . fromIntegral) v) else False
-            else False
+isPrime v | v > 2  = if odd v then checkDivisors v 3 ((floor . sqrt . fromIntegral) v) else False
+          | otherwise = False
 
 findPrimes :: Int -> Int -> [Int]
 findPrimes fst lst = filter isPrime [fst..lst]
