@@ -52,25 +52,34 @@ printBinTree Empty _  = []
 printBinTree (Leaf v) level = printNode v level
 printBinTree (Node v left right) level = printNode v level ++ printBinTree left (level + 1) ++ printBinTree right (level + 1)
 
-parseVal :: Token -> [Token] -> Maybe TokTree
-parseVal t [] = Just (Leaf t)
-parseVal t (x:xs) = case nextTokType of
-                      Value -> Nothing
-                      Operator -> case follow of
-                                    Just right -> Just (Node nextTok (Leaf x) right)
-                                    Nothing -> Nothing
-    where nextTok = head xs
-          nextTokType = tokenTyp nextTok
-          follow = parse xs
 
+findOperator :: [Token] -> Int -> Int -> (Bool, Int)
+findOperator [] _ _ = (False, 0)
+findOperator (x:xs) c pos | tokenVal x == "(" = findOperator xs (c + 1) (pos + 1)
+                          | tokenVal x == ")" = findOperator xs (c - 1) (pos + 1)
+                          | tokenIsOperation = (True, pos)
+                          | otherwise = findOperator xs c (pos + 1)
+                          where tokenIsOperation = c == 0 && tokenTyp x == Operator &&
+                                                   elem (tokenVal x) ["+","-","*","/"]
 
+parseTok :: [Token] -> Maybe TokTree
+parseTok [] = Nothing
+parseTok (x:xs) | null xs = Just (Leaf x)
+                | otherwise = Nothing
+                                    
 parse :: [Token] -> Maybe TokTree
 parse [] = Just Empty
-parse (x:xs) | tokenTyp x == Operator = case value of
-                                          "(" -> Just Empty
-                                          ")" -> Just Empty
-             | tokenTyp x == Value = parseVal x xs
-             where value = tokenVal x
+parse (x:xs) | tokenVal x == "(" && (tokenVal $ last xs) == ")" = parse $ init xs
+             | foundOperator = case leftTree of
+                                 Just l -> case rightTree of
+                                             Just r -> Just (Node ((x:xs) !! opPos) l r)
+                                             Nothing -> Nothing
+                                 Nothing -> Nothing
+             | otherwise = parseTok (x:xs)
+             where (foundOperator, opPos) = findOperator (x:xs) 0 0
+                   (left, right) = splitAt opPos (x:xs)
+                   leftTree = parse left
+                   rightTree = (parse . tail) right
 
 main :: IO ()
 main = do
