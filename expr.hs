@@ -53,14 +53,19 @@ printBinTree (Leaf v) level = printNode v level
 printBinTree (Node v left right) level = printNode v level ++ printBinTree left (level + 1) ++ printBinTree right (level + 1)
 
 
-findOperator :: [Token] -> Int -> Int -> (Bool, Int)
-findOperator [] _ _ = (False, 0)
-findOperator (x:xs) c pos | tokenVal x == "(" = findOperator xs (c + 1) (pos + 1)
-                          | tokenVal x == ")" = findOperator xs (c - 1) (pos + 1)
-                          | tokenIsOperation = (True, pos)
-                          | otherwise = findOperator xs c (pos + 1)
-                          where tokenIsOperation = c == 0 && tokenTyp x == Operator &&
-                                                   elem (tokenVal x) ["+","-","*","/"]
+findOperator :: [Token] -> [String] -> Int -> Int -> (Bool, Int)
+findOperator [] _ _ _ = (False, 0)
+findOperator (x:xs) ops c pos | tokenVal x == "(" = findOperator xs ops (c + 1) (pos + 1)
+                              | tokenVal x == ")" = findOperator xs ops (c - 1) (pos + 1)
+                              | tokenIsOperation = (True, pos)
+                              | otherwise = findOperator xs ops c (pos + 1)
+                              where tokenIsOperation = c == 0 && tokenTyp x == Operator &&
+                                                       elem (tokenVal x) ops
+
+findOperatorPrior :: [Token] -> (Bool, Int)
+findOperatorPrior toks | foundPlusMinus = (True, pos)
+                       | otherwise = findOperator toks ["*", "/"] 0 0
+                       where (foundPlusMinus, pos) = findOperator toks ["+", "-"] 0 0
 
 parseTok :: [Token] -> Maybe TokTree
 parseTok [] = Nothing
@@ -76,7 +81,7 @@ parse (x:xs) | tokenVal x == "(" && (tokenVal $ last xs) == ")" = parse $ init x
                                              Nothing -> Nothing
                                  Nothing -> Nothing
              | otherwise = parseTok (x:xs)
-             where (foundOperator, opPos) = findOperator (x:xs) 0 0
+             where (foundOperator, opPos) = findOperatorPrior (x:xs)
                    (left, right) = splitAt opPos (x:xs)
                    leftTree = parse left
                    rightTree = (parse . tail) right
