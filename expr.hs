@@ -3,7 +3,7 @@ import Data.Char as Char
 data Tree a = Leaf a | Node a (Tree a) (Tree a) | Empty
     deriving (Show)
 
-data TokenType = Operator | Value | Unknow
+data TokenType = Operator | Value
     deriving (Show, Eq)
 
 data Token = Token {
@@ -31,12 +31,8 @@ parseValue expr = break (not . Char.isDigit) expr
 
 tokens :: String -> Maybe [Token]
 tokens [] = Just []
-tokens expr | elem c operators = case followOp of
-                                   Just f  -> Just (newOperator [c] : f)
-                                   Nothing -> Nothing
-            | Char.isDigit c   = case followVal of
-                                   Just f -> Just (newValue value : f)
-                                   Nothing -> Nothing
+tokens expr | elem c operators = followOp >>= (\f -> return (newOperator [c] : f))
+            | Char.isDigit c   = followVal >>= (\f -> return (newValue value : f))
             | Char.isSpace c   = followOp
             | otherwise        = Nothing
             where c = head expr
@@ -69,31 +65,38 @@ findOperatorPrior toks | foundPlusMinus = (True, pos)
 
 parseTok :: [Token] -> Maybe TokTree
 parseTok [] = Nothing
-parseTok (x:xs) | null xs = Just (Leaf x)
+parseTok (x:xs) | isValue && null xs = Just (Leaf x)
                 | otherwise = Nothing
+                where isValue = tokenTyp x == Value
                                     
 parse :: [Token] -> Maybe TokTree
 parse [] = Just Empty
 parse (x:xs) | tokenVal x == "(" && (tokenVal $ last xs) == ")" = parse $ init xs
-             | foundOperator = case leftTree of
-                                 Just l -> case rightTree of
-                                             Just r -> Just (Node ((x:xs) !! opPos) l r)
-                                             Nothing -> Nothing
-                                 Nothing -> Nothing
+             | foundOperator = leftTree >>= (\l ->
+                                             rightTree >>= (\r ->
+                                                            return (Node ((x:xs) !! opPos) l r)))
              | otherwise = parseTok (x:xs)
              where (foundOperator, opPos) = findOperatorPrior (x:xs)
                    (left, right) = splitAt opPos (x:xs)
                    leftTree = parse left
                    rightTree = (parse . tail) right
 
+eval :: TokTree -> Int {-- Maybe Int--}
+eval Empty = 0
+eval (Leaf v) = (read . tokenVal) v
+eval (Node n l r) = case tokenVal n of
+                      "+" -> (eval l) + (eval r)
+                      "-" -> (eval l) - (eval r)
+                      "*" -> (eval l) * (eval r)
+                      "/" -> (eval l) `div` (eval r)
+
 main :: IO ()
 main = do
   expr <- readFile "expression.txt"
   let toks = tokens expr
-  let maybeTree = case toks of
-                    Just ts -> parse ts
-                    Nothing -> parse []
+  let maybeTree = toks >>= (\ts -> parse ts)
   let tree = case maybeTree of
                Just t -> t
                Nothing -> Empty
   putStrLn $ printBinTree tree 0
+  putStrLn $ (show . eval) tree
